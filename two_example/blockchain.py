@@ -7,6 +7,8 @@ from flask import Flask, jsonify, request
 
 from blockchain_obj import BlockChain
 
+from multiprocessing import Process
+
 app = Flask(__name__)
 
 #gen id for address
@@ -73,5 +75,51 @@ def full_chain():
     }
     return jsonify(response), 200
 
-if __name__ == '__main__':
+@app.route('/nodes/register', methods=['POST'])
+def register_nodes():
+    values = request.get_json()
+
+    nodes = values.get('nodes')
+
+    if nodes is None:
+        return "Error: Please supply a valid list of nodes", 400
+    
+    for node in nodes:
+        blockChain.register_node(node)
+    
+    response = {
+        'message': 'New nodes have been added',
+        'total_nodes': list(blockchain.nodes),
+    }
+    return jsonify(response), 201
+
+@app.route('/nodes/resolve', methods=['GET'])
+def consensus():
+    replaced = blockChain.resolve_conflicts()
+
+    if replaced:
+        response = {
+            'message': 'Our chain was replaced',
+            'new_chain': blockChain.chain
+        }
+    else:
+        response = {
+            'message': 'Our chain is authoritative',
+            'chain': blockChain.chain
+        }
+
+    return jsonify(response), 200
+
+def app_f():
     app.run(host='127.0.0.1', port=5000)
+
+def app_f1():
+    app.run(host='127.0.0.1', port=5001)
+
+if __name__ == '__main__':
+    
+    process1 = Process(target=app_f)
+    process2 = Process(target=app_f1)
+
+    process1.start()
+    process2.start()
